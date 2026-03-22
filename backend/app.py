@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import joblib
 import string
@@ -7,13 +7,11 @@ import os
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# Download stopwords (important for Render)
 nltk.download('stopwords', quiet=True)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="dist", static_url_path="")
 CORS(app)
 
-# Load model (use correct path)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 model = joblib.load(os.path.join(BASE_DIR, "models/spam_classifier.pkl"))
@@ -29,16 +27,9 @@ def clean_text(text):
     words = [stemmer.stem(word) for word in words if word not in stop_words]
     return ' '.join(words)
 
-@app.route("/")
-def home():
-    return "Backend is running!"
-
 @app.route("/predict", methods=["POST"])
 def predict():
     data = request.json.get("email", "")
-
-    if data.strip() == "":
-        return jsonify({"error": "No input provided"}), 400
 
     cleaned = clean_text(data)
     vectorized = vectorizer.transform([cleaned])
@@ -51,6 +42,15 @@ def predict():
         "confidence": float(proba)
     })
 
-# IMPORTANT FOR RENDER
+# Serve React frontend
+@app.route("/")
+def serve():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>")
+def static_files(path):
+    return send_from_directory(app.static_folder, path)
+
+# Render config
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
